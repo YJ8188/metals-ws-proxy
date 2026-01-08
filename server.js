@@ -17,8 +17,8 @@ const app = express();
 
 // 目标服务器配置
 const TARGET_SERVER = {
-    host: process.env.TARGET_HOST || '120.25.236.183',
-    port: process.env.TARGET_PORT || 80,
+    host: '120.25.236.183',  // 强制使用这个地址
+    port: 8189,              // 强制使用 8189 端口
     protocol: 'http'
 };
 
@@ -44,15 +44,26 @@ const wsProxy = createProxyMiddleware({
     target: TARGET_URL,
     changeOrigin: true,
     ws: true,  // 启用 WebSocket 代理
+    ws: true,  // 强制启用 WebSocket
+    secure: false,  // 目标服务器不使用 SSL
 
     // 超时配置
     proxyTimeout: 60000,  // 60秒超时
     timeout: 60000,
 
     // 错误处理
-    onError: (err, req, res) => {
+    onError: (err, req, res, next) => {
         console.error('❌ 代理错误:', err.message);
-        if (!res.headersSent) {
+        console.error('请求信息:', req.method, req.url);
+
+        // WebSocket 错误不返回响应
+        if (req.headers.upgrade) {
+            console.log('WebSocket 连接错误，不返回响应');
+            return;
+        }
+
+        // HTTP 错误返回 JSON
+        if (!res.headersSent && typeof res.status === 'function') {
             res.status(500).json({
                 error: '代理错误',
                 message: err.message,
@@ -137,6 +148,16 @@ app.get('/', (req, res) => {
 
 // 应用 WebSocket 代理（处理所有路径）
 app.use('/', wsProxy);
+
+// 404 处理
+app.use((req, res) => {
+    console.log('⚠️  未找到路径:', req.url);
+    res.status(404).json({
+        error: '未找到',
+        path: req.url,
+        timestamp: new Date().toISOString()
+    });
+});
 
 // 错误处理中间件
 app.use((err, req, res, next) => {
