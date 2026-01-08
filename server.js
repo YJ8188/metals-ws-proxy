@@ -87,23 +87,35 @@ const wsProxy = createProxyMiddleware({
 
     // WebSocket 升级处理
     onProxyReqWs: (proxyReq, req, socket, options, head) => {
-        console.log(`🔗 WebSocket 连接: ${req.url}`);
+        console.log(`🔗 WebSocket 连接建立: ${req.url}`);
+        console.log(`📤 目标服务器: ${TARGET_URL}${req.url}`);
+        console.log(`📋 请求头:`, req.headers);
+
         // 添加 WebSocket 特定的头
         proxyReq.setHeader('X-Forwarded-For', req.socket.remoteAddress);
-    },
-
-    // WebSocket 错误处理
-    onProxyReqWs: (proxyReq, req, socket, options, head) => {
-        console.log(`🔗 WebSocket 连接建立: ${req.url}`);
+        proxyReq.setHeader('X-Real-IP', req.socket.remoteAddress);
+        proxyReq.setHeader('X-Forwarded-Proto', 'https');
+        proxyReq.setHeader('X-Forwarded-Host', req.headers.host);
 
         // 监听代理连接的错误
         proxyReq.on('error', (err) => {
             console.error('❌ WebSocket 代理错误:', err.message);
+            console.error('错误详情:', err);
         });
 
         // 监听客户端连接的错误
         socket.on('error', (err) => {
             console.error('❌ 客户端 WebSocket 错误:', err.message);
+        });
+
+        // 监听代理连接关闭
+        proxyReq.on('close', () => {
+            console.log('🔌 代理连接关闭');
+        });
+
+        // 监听客户端连接关闭
+        socket.on('close', () => {
+            console.log('🔌 客户端连接关闭');
         });
     },
 
